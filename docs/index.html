@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aplicativo de Optimización IO</title>
+<style>
+/* Minimalista: fondo blanco, tipografía del sistema, una sola tinta, líneas finas. */
+:root {
+  --paper: #ffffff; --card: #ffffff; --ink: #1a1a1a; --muted: #6b6b6b; --line: #e6e6e6;
+  --accent: #1a1a1a; --accent-soft: #f5f5f5; --good: #1d6b43; --warn: #8a5a00; --crit: #b3261e;
+  --good-bg: #f1f7f3; --warn-bg: #fbf6ea; --crit-bg: #fcf0ef; --info-bg: #f6f6f6;
+  --s1: #2b6cb0; --s2: #d9822b; --s3: #7b5fb8; --s4: #3a8f62; --s5: #b84a6a; --s6: #8a97a3;
+  --grid: rgba(0,0,0,.06);
+  --f-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --f-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #121212; --card: #121212; --ink: #eaeaea; --muted: #9a9a9a; --line: #2c2c2c;
+    --accent: #eaeaea; --accent-soft: #1c1c1c; --good: #6fcf97; --warn: #e6b04a; --crit: #ff8a80;
+    --good-bg: #16231c; --warn-bg: #2a2412; --crit-bg: #2e1816; --info-bg: #1b1b1b;
+    --s1: #5aa7ec; --s2: #f0a050; --s3: #a58df0; --s4: #62c58f; --s5: #ef7c9d; --s6: #9db0c0;
+    --grid: rgba(255,255,255,.07);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #121212; --card: #121212; --ink: #eaeaea; --muted: #9a9a9a; --line: #2c2c2c;
+  --accent: #eaeaea; --accent-soft: #1c1c1c; --good: #6fcf97; --warn: #e6b04a; --crit: #ff8a80;
+  --good-bg: #16231c; --warn-bg: #2a2412; --crit-bg: #2e1816; --info-bg: #1b1b1b;
+  --s1: #5aa7ec; --s2: #f0a050; --s3: #a58df0; --s4: #62c58f; --s5: #ef7c9d; --s6: #9db0c0;
+  --grid: rgba(255,255,255,.07);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--paper); color: var(--ink); font: 400 14.5px/1.55 var(--f-sans); }
+.wrap { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+header.top { border-bottom: 1px solid var(--line); }
+header.top .wrap { padding-top: 26px; }
+.kicker { font-size: 12px; color: var(--muted); margin: 0 0 6px; }
+h1 { font: 600 22px/1.2 var(--f-sans); margin: 0 0 4px; letter-spacing: -.01em; }
+.lead { color: var(--muted); margin: 0 0 18px; max-width: 70ch; font-size: 14px; }
+nav.tabs { display: flex; gap: 22px; flex-wrap: wrap; }
+nav.tabs button { font: 500 14px var(--f-sans); color: var(--muted); background: none; border: 0; border-bottom: 2px solid transparent;
+  padding: 8px 0; margin-bottom: -1px; cursor: pointer; }
+nav.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+nav.tabs button:hover { color: var(--ink); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+main .wrap { padding-top: 26px; padding-bottom: 60px; }
+section.panel[hidden] { display: none; }
+.layout { display: grid; grid-template-columns: minmax(300px, 360px) minmax(0, 1fr); gap: 36px; align-items: start; }
+@media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); gap: 24px; } }
+.card { background: transparent; border: 0; border-top: 1px solid var(--line); border-radius: 0; padding: 16px 0 6px; }
+.card + .card { margin-top: 10px; }
+.layout > div:first-child .card:first-child, .layout > div:last-child > .card:first-child, #g-out > .card:first-child, #c-out > .card:first-child, #m-out > .card:first-child { border-top: 0; padding-top: 0; }
+h2 { font: 600 15px/1.3 var(--f-sans); margin: 0 0 4px; }
+h3 { font: 600 13px/1.3 var(--f-sans); margin: 0 0 8px; }
+.hint { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 11px; }
+.field > label, .lab { font-size: 12.5px; color: var(--muted); }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+input[type=number], input[type=text], select { width: 100%; font: 400 14px var(--f-mono); color: var(--ink); background: var(--paper);
+  border: 1px solid var(--line); border-radius: 4px; padding: 7px 9px; min-width: 0; }
+input[type=text], select { font-family: var(--f-sans); }
+input:hover, select:hover { border-color: var(--muted); }
+input.bad { border-color: var(--crit); background: var(--crit-bg); }
+input[type=range] { width: 100%; accent-color: var(--ink); }
+.seg { align-self: flex-start; display: inline-flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.seg label { padding: 6px 12px; font-size: 13px; cursor: pointer; color: var(--muted); background: var(--paper); }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label:has(input:checked) { background: var(--ink); color: var(--paper); }
+.seg label:has(input:focus-visible) { outline: 2px solid var(--ink); outline-offset: -2px; }
+.btn { font: 500 13px var(--f-sans); border: 1px solid var(--line); background: var(--paper); color: var(--ink); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+.btn:hover { border-color: var(--ink); }
+.btn.ghost { color: var(--muted); }
+table.t { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+table.t th { text-align: left; font-weight: 500; color: var(--muted); font-size: 12.5px; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+table.t td { padding: 6px 8px; border-bottom: 1px solid var(--line); }
+table.t td.n, table.t th.n { text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+table.t tr.best td { background: var(--accent-soft); font-weight: 600; }
+table.t tr.off td { color: var(--muted); }
+.scroll { overflow-x: auto; }
+.rrow { border-bottom: 1px solid var(--line); padding: 8px 0 10px; }
+.rrow .top { display: flex; gap: 6px; margin-bottom: 6px; }
+.rrow .top input { flex: 1; }
+.rrow .eq { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr) auto 58px minmax(0,1fr); gap: 6px; align-items: center; font: 400 13px var(--f-mono); color: var(--muted); }
+.rrow select { font-family: var(--f-mono); padding: 6px 2px; }
+.rtab input { padding: 5px 6px; font-size: 13px; }
+.rtab td { padding: 4px 4px; border: 0; }
+.rtab th { padding: 2px 4px; border: 0; }
+.msg { border-left: 3px solid var(--line); border-radius: 0; padding: 8px 12px; margin: 0 0 12px; font-size: 14px; background: var(--info-bg); }
+.msg.good { background: var(--good-bg); border-left-color: var(--good); color: var(--ink); }
+.msg.warn { background: var(--warn-bg); border-left-color: var(--warn); color: var(--ink); }
+.msg.crit { background: var(--crit-bg); border-left-color: var(--crit); color: var(--ink); }
+.msg.info { background: var(--info-bg); border-left-color: var(--muted); color: var(--ink); }
+.msg b { font-weight: 600; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 18px 24px; margin-bottom: 14px; }
+.kpi { border: 0; padding: 0; background: none; }
+.kpi .k { font-size: 12px; color: var(--muted); }
+.kpi .v { font: 500 21px/1.25 var(--f-mono); font-variant-numeric: tabular-nums; }
+.chip { display: inline-block; font-size: 12.5px; padding: 1px 9px; border-radius: 99px; border: 1px solid var(--line); margin: 0 6px 6px 0; color: var(--muted); }
+.chip.y { color: var(--good); border-color: var(--good); }
+.chip.n { color: var(--warn); border-color: var(--warn); }
+svg.chart { width: 100%; height: auto; display: block; }
+svg .gl { stroke: var(--grid); stroke-width: 1; }
+svg .ax { stroke: var(--muted); stroke-width: 1; }
+svg text { font: 11px var(--f-mono); fill: var(--muted); }
+svg text.lab { fill: var(--ink); }
+svg text.halo { paint-order: stroke; stroke: var(--paper); stroke-width: 3px; stroke-linejoin: round; fill: var(--ink); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 18px; height: 3px; margin-right: 6px; vertical-align: middle; border-radius: 2px; }
+.legend i.box { height: 10px; width: 14px; opacity: .55; }
+.heat { display: grid; gap: 2px; margin: 4px 0 4px; }
+.heat div { padding: 9px 4px; text-align: center; font: 500 13px var(--f-mono); }
+.heat .hd { background: transparent; color: var(--muted); font-weight: 400; font-size: 12px; padding: 4px; }
+.sp { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+.foot { margin-top: 30px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+.mono { font-family: var(--f-mono); }
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <p class="kicker">ITM · Investigación de Operaciones</p>
+  <h1>Aplicativo de optimización</h1>
+  <p class="lead">Método gráfico, teoría de colas y cadenas de Markov. Modifique cualquier dato y el resultado se recalcula al instante. Ejemplo precargado: cafetería universitaria (datos ilustrativos).</p>
+  <nav class="tabs" role="tablist" aria-label="Técnicas">
+    <button role="tab" id="tab-grafico" aria-selected="true" data-t="grafico">1. Método gráfico</button>
+    <button role="tab" id="tab-colas" aria-selected="false" data-t="colas">2. Teoría de colas</button>
+    <button role="tab" id="tab-markov" aria-selected="false" data-t="markov">3. Cadenas de Markov</button>
+  </nav>
+</div></header>
+<main><div class="wrap">
+
+<!-- ========================= 1. GRAFICO ========================= -->
+<section class="panel" id="p-grafico" role="tabpanel" aria-labelledby="tab-grafico">
+ <div class="layout">
+  <div>
+   <div class="card">
+    <div class="sp"><h2>Datos del modelo</h2><button class="btn ghost" id="g-reset">Restablecer ejemplo</button></div>
+    <p class="hint">Programación lineal con dos variables (x₁, x₂ ≥ 0). Ejemplo: cuántos sándwiches y wraps producir al día; utilidad en miles de COP.</p>
+    <div class="field"><span class="lab">Objetivo</span>
+      <div class="seg" role="radiogroup" aria-label="Objetivo">
+        <label><input type="radio" name="g-obj" value="max" checked>Maximizar</label>
+        <label><input type="radio" name="g-obj" value="min">Minimizar</label></div></div>
+    <div class="row2">
+      <div class="field"><label for="g-c1">c₁ · utilidad de x₁</label><input type="number" id="g-c1" step="any" value="3"></div>
+      <div class="field"><label for="g-c2">c₂ · utilidad de x₂</label><input type="number" id="g-c2" step="any" value="2"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label for="g-n1">Nombre de x₁</label><input type="text" id="g-n1" value="Sándwich"></div>
+      <div class="field"><label for="g-n2">Nombre de x₂</label><input type="text" id="g-n2" value="Wrap"></div>
+    </div>
+    <h3>Restricciones <span class="mono" style="font-weight:400;color:var(--muted)">a₁x₁ + a₂x₂ (op) b</span></h3>
+    <div id="g-rows"></div>
+    <button class="btn" id="g-add" style="margin-top:8px">+ Agregar restricción</button>
+   </div>
+   <div class="card">
+    <h2>Escenario «¿y si…?»</h2>
+    <p class="hint">Cambie el lado derecho de una restricción y compare con el óptimo base. Estima el precio sombra ΔZ/Δb.</p>
+    <div class="field"><label for="g-wk">Restricción a modificar</label><select id="g-wk"></select></div>
+    <div class="field"><label for="g-wd">Cambio Δ en b</label><input type="number" id="g-wd" step="any" value="0"></div>
+   </div>
+  </div>
+  <div id="g-out"></div>
+ </div>
+</section>
+
+<!-- ========================= 2. COLAS ========================= -->
+<section class="panel" id="p-colas" role="tabpanel" aria-labelledby="tab-colas" hidden>
+ <div class="layout">
+  <div>
+   <div class="card">
+    <div class="sp"><h2>Datos del sistema</h2><button class="btn ghost" id="c-reset">Restablecer ejemplo</button></div>
+    <p class="hint">Modelo M/M/s (M/M/1 si s = 1). Ejemplo: caja de la cafetería en hora pico. Todas las tasas en la misma unidad de tiempo (hora).</p>
+    <div class="field"><label for="c-lam">λ · llegadas por hora</label><input type="number" id="c-lam" step="any" min="0" value="40"></div>
+    <div class="field"><label for="c-mu">μ · atenciones por hora de un cajero</label><input type="number" id="c-mu" step="any" min="0" value="25"></div>
+    <h3>Costos (miles de COP por hora)</h3>
+    <div class="row2">
+      <div class="field"><label for="c-cs">Por cajero activo</label><input type="number" id="c-cs" step="any" min="0" value="8"></div>
+      <div class="field"><label for="c-cw">Espera por cliente</label><input type="number" id="c-cw" step="any" min="0" value="12"></div>
+    </div>
+    <div class="field"><span class="lab">El costo de espera se aplica a</span>
+      <div class="seg" role="radiogroup" aria-label="Base del costo de espera">
+        <label><input type="radio" name="c-base" value="L" checked>Clientes en el sistema (L)</label>
+        <label><input type="radio" name="c-base" value="Lq">Clientes en cola (Lq)</label></div></div>
+    <h3>Cajeros a evaluar</h3>
+    <div class="row2">
+      <div class="field"><label for="c-smin">Desde s =</label><input type="number" id="c-smin" min="1" max="30" step="1" value="1"></div>
+      <div class="field"><label for="c-smax">Hasta s =</label><input type="number" id="c-smax" min="1" max="30" step="1" value="5"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label for="c-ssel">s para el detalle</label><input type="number" id="c-ssel" min="1" max="30" step="1" value="3"></div>
+      <div class="field"><label for="c-t">t (min) en P(Wq &gt; t)</label><input type="number" id="c-t" min="0" step="any" value="5"></div>
+    </div>
+   </div>
+  </div>
+  <div id="c-out"></div>
+ </div>
+</section>
+
+<!-- ========================= 3. MARKOV ========================= -->
+<section class="panel" id="p-markov" role="tabpanel" aria-labelledby="tab-markov" hidden>
+ <div class="layout">
+  <div>
+   <div class="card">
+    <div class="sp"><h2>Datos de la cadena</h2><button class="btn ghost" id="m-reset">Restablecer ejemplo</button></div>
+    <p class="hint">P[i][j] es la probabilidad de pasar del estado i al j en un paso. Ejemplo: sitio donde almuerzan los estudiantes cada semana.</p>
+    <div class="field"><label for="m-N">Número de estados (2 a 6)</label><input type="number" id="m-N" min="2" max="6" step="1" value="3"></div>
+    <h3>Nombres de los estados</h3>
+    <div id="m-names" class="row2"></div>
+    <h3 style="margin-top:12px">Matriz de transición P <span style="font-weight:400;color:var(--muted)">· cada fila suma 1</span></h3>
+    <div class="scroll"><table class="t rtab" id="m-P"></table></div>
+    <h3 style="margin-top:12px">Distribución inicial π(0) <span style="font-weight:400;color:var(--muted)">· suma 1</span></h3>
+    <div class="scroll"><table class="t rtab" id="m-pi0"></table></div>
+    <div class="row2" style="margin-top:12px">
+      <div class="field"><label for="m-n">Pasos n (semanas)</label><input type="number" id="m-n" min="1" max="60" step="1" value="4"></div>
+      <div class="field"><label for="m-pob">Población total</label><input type="number" id="m-pob" min="1" step="1" value="1000"></div>
+    </div>
+   </div>
+   <div class="card">
+    <h2>Escenario «¿y si…?»</h2>
+    <p class="hint">Cambia la probabilidad de permanecer en un estado; el resto de la fila se reparte en proporción a sus valores.</p>
+    <div class="field"><label><input type="checkbox" id="m-wi"> Activar escenario</label></div>
+    <div class="field"><label for="m-ws">Estado cuya retención cambia</label><select id="m-ws"></select></div>
+    <div class="field"><label for="m-wr">Nueva P[i][i]: <span class="mono" id="m-wrv">0.70</span></label><input type="range" id="m-wr" min="0" max="1" step="0.01" value="0.7"></div>
+   </div>
+  </div>
+  <div id="m-out"></div>
+ </div>
+</section>
+
+<p class="foot">Los valores del ejemplo son ilustrativos y definidos para la demostración. Para una decisión real, reemplácelos por datos medidos. Motores de cálculo equivalentes a los del aplicativo en Python (<span class="mono">modulos/grafico.py</span>, <span class="mono">colas.py</span>, <span class="mono">markov.py</span>).</p>
+</div></main>
+
+<script>
+"use strict";
+/* ===================== utilidades ===================== */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const f = (x, d = 4) => Number.isFinite(x) ? x.toFixed(d) : "—";
+const gs = x => { const v = +(+x).toFixed(6); return String(Object.is(v, -0) ? 0 : v); };
+const num = id => { const e = $(id); const v = parseFloat(e.value); e.classList.toggle("bad", !Number.isFinite(v)); return Number.isFinite(v) ? v : NaN; };
+const SER = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5)", "var(--s6)"];
+function niceStep(raw) { const p = Math.pow(10, Math.floor(Math.log10(raw))); const m = raw / p; return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p; }
+const fact = n => { let r = 1; for (let i = 2; i <= n; i++) r *= i; return r; };
+const gcd = (a, b) => b ? gcd(b, a % b) : a;
+function ticks(max) { const st = niceStep(max / 5); const t = []; for (let v = 0; v <= max + 1e-9; v += st) t.push(+v.toFixed(10)); return t; }
+
+/* ===================== MOTOR: método gráfico ===================== */
+const TOL = 1e-7;
+function esFactible(p, R, tol = TOL) {
+  if (p[0] < -tol || p[1] < -tol) return false;
+  for (const r of R) {
+    const v = r.a1 * p[0] + r.a2 * p[1];
+    if (r.op === "<=" && v > r.b + tol) return false;
+    if (r.op === ">=" && v < r.b - tol) return false;
+    if (r.op === "=" && Math.abs(v - r.b) > tol) return false;
+  }
+  return true;
+}
+function vertices(R) {
+  const L = R.map(r => [r.a1, r.a2, r.b]).concat([[1, 0, 0], [0, 1, 0]]);
+  const pts = [];
+  for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) {
+    const [a1, a2, b] = L[i], [c1, c2, d] = L[j];
+    const det = a1 * c2 - a2 * c1;
+    if (Math.abs(det) < 1e-12) continue;
+    const p = [+(((b * c2 - a2 * d) / det)).toFixed(9) + 0, +(((a1 * d - b * c1) / det)).toFixed(9) + 0];
+    if (esFactible(p, R) && !pts.some(q => Math.abs(p[0] - q[0]) <= 1e-6 && Math.abs(p[1] - q[1]) <= 1e-6)) pts.push(p);
+  }
+  return pts;
+}
+function ordenar(P) {
+  if (P.length < 3) return P;
+  const cx = P.reduce((s, p) => s + p[0], 0) / P.length, cy = P.reduce((s, p) => s + p[1], 0) / P.length;
+  return P.slice().sort((p, q) => Math.atan2(p[1] - cy, p[0] - cx) - Math.atan2(q[1] - cy, q[0] - cx));
+}
+function poligonoCaja(R) {
+  const V = vertices(R);
+  const m = Math.max(1, ...V.flat().map(Math.abs));
+  const caja = m * 2 + 10;
+  return ordenar(vertices(R.concat([{ a1: 1, a2: 0, op: "<=", b: caja }, { a1: 0, a2: 1, op: "<=", b: caja }])));
+}
+function noAcotado(c1, c2, R, max) {
+  const dirs = [[1, 0], [0, 1]];
+  for (const r of R) { const n = Math.hypot(r.a1, r.a2); if (n > 1e-12) { dirs.push([r.a2 / n, -r.a1 / n], [-r.a2 / n, r.a1 / n]); } }
+  for (const d of dirs) {
+    if (d[0] < -1e-9 || d[1] < -1e-9) continue;
+    let ok = true;
+    for (const r of R) {
+      const v = r.a1 * d[0] + r.a2 * d[1];
+      if (r.op === "<=" && v > 1e-9) ok = false;
+      if (r.op === ">=" && v < -1e-9) ok = false;
+      if (r.op === "=" && Math.abs(v) > 1e-9) ok = false;
+    }
+    if (!ok) continue;
+    const val = c1 * d[0] + c2 * d[1];
+    if (max ? val > 1e-9 : val < -1e-9) return true;
+  }
+  return false;
+}
+function resolverPL(c1, c2, R, max) {
+  const V = vertices(R);
+  if (!V.length) return { estado: "infactible" };
+  const poligono = poligonoCaja(R);
+  const Z = V.map(p => [p[0], p[1], c1 * p[0] + c2 * p[1]]);
+  if (noAcotado(c1, c2, R, max)) return { estado: "no_acotado", vertices: Z, poligono };
+  const zopt = (max ? Math.max : Math.min)(...Z.map(z => z[2]));
+  const opts = Z.filter(z => Math.abs(z[2] - zopt) < 1e-6);
+  const best = opts[0];
+  const holguras = R.map(r => r.op === "=" ? 0 : Math.abs(+(r.b - (r.a1 * best[0] + r.a2 * best[1])).toFixed(9)));
+  return { estado: "optimo", vertices: Z.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]), optimo: best, multiples: opts.length > 1, alternos: opts, holguras, poligono };
+}
+
+/* ===================== MOTOR: colas M/M/s ===================== */
+function mms(lam, mu, s) {
+  const rho = lam / (s * mu);
+  if (!(rho < 1)) return { s, lam, mu, estable: false, rho };
+  const a = lam / mu;
+  let suma = 0; for (let n = 0; n < s; n++) suma += Math.pow(a, n) / fact(n);
+  const ult = Math.pow(a, s) / (fact(s) * (1 - rho));
+  const P0 = 1 / (suma + ult);
+  const Lq = P0 * Math.pow(a, s) * rho / (fact(s) * Math.pow(1 - rho, 2));
+  const Wq = Lq / lam, W = Wq + 1 / mu;
+  return { s, lam, mu, estable: true, rho, a, P0, Pespera: ult * P0, Lq, L: lam * W, Wq, W };
+}
+const probN = (m, n) => n < m.s ? m.P0 * Math.pow(m.a, n) / fact(n) : m.P0 * Math.pow(m.a, n) / (fact(m.s) * Math.pow(m.s, n - m.s));
+const probEsperaMayor = (m, t) => m.Pespera * Math.exp(-(m.s * m.mu - m.lam) * t);
+function tablaCostos(lam, mu, smin, smax, cs, cw, base) {
+  const out = [];
+  for (let s = smin; s <= smax; s++) {
+    const m = mms(lam, mu, s);
+    if (!m.estable) { out.push({ s, rho: m.rho, estable: false }); continue; }
+    const cserv = cs * s, cesp = cw * (base === "L" ? m.L : m.Lq);
+    out.push({ s, rho: m.rho, estable: true, L: m.L, Lq: m.Lq, W: m.W, Wq: m.Wq, cserv, cesp, total: cserv + cesp });
+  }
+  return out;
+}
+
+/* ===================== MOTOR: cadenas de Markov ===================== */
+const mmul = (A, B) => A.map(r => B[0].map((_, j) => r.reduce((s, v, k) => s + v * B[k][j], 0)));
+const vmul = (v, P) => P[0].map((_, j) => v.reduce((s, x, i) => s + x * P[i][j], 0));
+function validarP(P, tol = 1e-6) {
+  const e = [];
+  if (P.some(r => r.some(v => !Number.isFinite(v)))) return ["Hay celdas vacías o con texto en la matriz."];
+  if (P.some(r => r.some(v => v < -tol))) e.push("Hay probabilidades negativas.");
+  if (P.some(r => r.some(v => v > 1 + tol))) e.push("Hay probabilidades mayores que 1.");
+  P.forEach((r, i) => { const s = r.reduce((a, b) => a + b, 0); if (Math.abs(s - 1) > tol) e.push(`La fila ${i + 1} suma ${s.toFixed(4)} (debe sumar 1).`); });
+  return e;
+}
+function proyectar(pi0, P, n) { const o = [pi0.slice()]; let p = pi0.slice(); for (let k = 0; k < n; k++) { p = vmul(p, P); o.push(p); } return o; }
+function clasificar(P) {
+  const N = P.length, T = 1e-8;
+  let R = P.map((r, i) => r.map((v, j) => v > T || i === j));
+  for (let k = 0; k < N; k++) for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) if (R[i][k] && R[k][j]) R[i][j] = true;
+  const clases = [], vistos = new Set();
+  for (let i = 0; i < N; i++) { if (vistos.has(i)) continue; const c = []; for (let j = 0; j < N; j++) if (R[i][j] && R[j][i]) { c.push(j); vistos.add(j); } clases.push(c); }
+  const irred = clases.length === 1;
+  const periodo = i => { let g = 0, M = P.map((_, a) => P.map((__, b) => +(a === b))); for (let n = 1; n <= 2 * N * N; n++) { M = mmul(M, P); if (M[i][i] > T) { g = gcd(g, n); if (g === 1) return 1; } } return g; };
+  const pers = P.map((_, i) => periodo(i));
+  const aper = irred && pers.every(p => p === 1);
+  return { irreducible: irred, aperiodica: aper, ergodica: irred && aper, absorbentes: P.map((r, i) => Math.abs(r[i] - 1) < T ? i : -1).filter(i => i >= 0), periodos: pers };
+}
+function resolverSistema(A, b) {
+  const n = A.length, M = A.map((r, i) => [...r, b[i]]);
+  for (let c = 0; c < n; c++) {
+    let p = c; for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+    [M[c], M[p]] = [M[p], M[c]];
+    for (let r = c + 1; r < n; r++) { const k = M[r][c] / M[c][c]; for (let j = c; j <= n; j++) M[r][j] -= k * M[c][j]; }
+  }
+  const x = new Array(n).fill(0);
+  for (let i = n - 1; i >= 0; i--) { let s = M[i][n]; for (let j = i + 1; j < n; j++) s -= M[i][j] * x[j]; x[i] = s / M[i][i]; }
+  return x;
+}
+function estadoEstable(P) {
+  const N = P.length;
+  if (!clasificar(P).irreducible) return null;
+  const A = []; for (let j = 0; j < N - 1; j++) A.push(P.map((r, i) => r[j] - (i === j ? 1 : 0)));
+  A.push(new Array(N).fill(1));
+  return resolverSistema(A, [...new Array(N - 1).fill(0), 1]);
+}
+function primeraPasada(P) {
+  const N = P.length, M = P.map(() => new Array(N).fill(0));
+  for (let j = 0; j < N; j++) {
+    const idx = [...Array(N).keys()].filter(i => i !== j);
+    const A = idx.map((i, a) => idx.map((k, b) => (a === b ? 1 : 0) - P[i][k]));
+    const m = resolverSistema(A, idx.map(() => 1));
+    idx.forEach((i, a) => { M[i][j] = m[a]; });
+    M[j][j] = 1 + idx.reduce((s, k, a) => s + P[j][k] * m[a], 0);
+  }
+  return M;
+}
+function pasosConv(pi0, P, eps = 1e-3, maxN = 500) {
+  const pe = estadoEstable(P); if (!pe) return null;
+  let p = pi0.slice();
+  for (let n = 0; n <= maxN; n++) { if (Math.max(...p.map((v, i) => Math.abs(v - pe[i]))) < eps) return n; p = vmul(p, P); }
+  return null;
+}
+
+/* ===================== UI: pestañas ===================== */
+function showTab(t) {
+  if (!["grafico", "colas", "markov"].includes(t)) t = "grafico";
+  $$("nav.tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.t === t));
+  $$("section.panel").forEach(s => s.hidden = s.id !== "p-" + t);
+  if (location.hash !== "#" + t) history.replaceState(null, "", "#" + t);
+}
+$$("nav.tabs button").forEach(b => b.addEventListener("click", () => showTab(b.dataset.t)));
+window.addEventListener("hashchange", () => showTab(location.hash.slice(1)));
+
+/* ===================== UI: método gráfico ===================== */
+const G0 = () => ({ rows: [{ n: "Pan/tortillas", a1: 2, a2: 1, op: "<=", b: 100 }, { n: "Relleno (porciones)", a1: 1, a2: 1, op: "<=", b: 80 }, { n: "Capacidad de plancha", a1: 1, a2: 0, op: "<=", b: 40 }] });
+let GR = G0().rows;
+const PAL = ["#1f6fb2", "#e07b1a", "#6a4fb3", "#2f8f5b", "#b23a5a", "#17a2b8", "#8c6d1f", "#7a8b99"];
+function gRowsUI() {
+  $("#g-rows").innerHTML = GR.map((r, i) => `<div class="rrow">
+    <div class="top"><input type="text" data-i="${i}" data-k="n" value="${esc(r.n)}" aria-label="Nombre restricción ${i + 1}"><button class="btn ghost" data-del="${i}" aria-label="Borrar restricción ${i + 1}">✕</button></div>
+    <div class="eq">
+      <input type="number" step="any" data-i="${i}" data-k="a1" value="${r.a1}" aria-label="a1 fila ${i + 1}"><span>x₁ +</span>
+      <input type="number" step="any" data-i="${i}" data-k="a2" value="${r.a2}" aria-label="a2 fila ${i + 1}"><span>x₂</span>
+      <select data-i="${i}" data-k="op" aria-label="Operador fila ${i + 1}">${["<=", ">=", "="].map(o => `<option${o === r.op ? " selected" : ""}>${o}</option>`).join("")}</select>
+      <input type="number" step="any" data-i="${i}" data-k="b" value="${r.b}" aria-label="b fila ${i + 1}"></div></div>`).join("");
+  const sel = $("#g-wk"); const cur = sel.selectedIndex;
+  sel.innerHTML = GR.map((r, i) => `<option value="${i}">${esc(r.n || "Restricción " + (i + 1))}</option>`).join("");
+  sel.selectedIndex = Math.min(Math.max(cur, 0), GR.length - 1);
+}
+$("#g-rows").addEventListener("input", e => {
+  const i = e.target.dataset.i, k = e.target.dataset.k; if (i === undefined) return;
+  if (k === "n" || k === "op") GR[i][k] = e.target.value; else { const v = parseFloat(e.target.value); GR[i][k] = Number.isFinite(v) ? v : NaN; e.target.classList.toggle("bad", !Number.isFinite(v)); }
+  if (k === "n") { const o = $("#g-wk").options[i]; if (o) o.textContent = e.target.value || "Restricción " + (+i + 1); }
+  gOut();
+});
+$("#g-rows").addEventListener("click", e => { const d = e.target.closest("[data-del]"); if (!d) return; GR.splice(+d.dataset.del, 1); gRowsUI(); gOut(); });
+$("#g-add").addEventListener("click", () => { GR.push({ n: "Restricción " + (GR.length + 1), a1: 1, a2: 1, op: "<=", b: 10 }); gRowsUI(); gOut(); });
+$("#g-reset").addEventListener("click", () => {
+  GR = G0().rows; $("#g-c1").value = 3; $("#g-c2").value = 2; $("#g-n1").value = "Sándwich"; $("#g-n2").value = "Wrap"; $("#g-wd").value = 0;
+  $$('input[name="g-obj"]')[0].checked = true; gRowsUI(); gOut();
+});
+["#g-c1", "#g-c2", "#g-n1", "#g-n2", "#g-wk", "#g-wd"].forEach(s => $(s).addEventListener("input", gOut));
+$$('input[name="g-obj"]').forEach(r => r.addEventListener("change", gOut));
+
+function gPlot(res, R, names, c1, c2, lim) {
+  const W = 640, H = 500, ml = 50, mr = 16, mt = 14, mb = 42;
+  const sx = x => ml + x / lim * (W - ml - mr), sy = y => H - mb - y / lim * (H - mt - mb);
+  let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Región factible y solución óptima"><defs><clipPath id="gclip"><rect x="${ml}" y="${mt}" width="${W - ml - mr}" height="${H - mt - mb}"/></clipPath></defs>`;
+  for (const t of ticks(lim)) {
+    s += `<line class="gl" x1="${sx(t)}" y1="${mt}" x2="${sx(t)}" y2="${H - mb}"/><line class="gl" x1="${ml}" y1="${sy(t)}" x2="${W - mr}" y2="${sy(t)}"/>`;
+    s += `<text x="${sx(t)}" y="${H - mb + 16}" text-anchor="middle">${gs(t)}</text><text x="${ml - 7}" y="${sy(t) + 4}" text-anchor="end">${gs(t)}</text>`;
+  }
+  s += `<line class="ax" x1="${ml}" y1="${H - mb}" x2="${W - mr}" y2="${H - mb}"/><line class="ax" x1="${ml}" y1="${mt}" x2="${ml}" y2="${H - mb}"/>`;
+  s += `<text class="lab" x="${(ml + W - mr) / 2}" y="${H - 6}" text-anchor="middle">x₁ = ${esc(names[0])}</text><text class="lab" transform="translate(13 ${(mt + H - mb) / 2}) rotate(-90)" text-anchor="middle">x₂ = ${esc(names[1])}</text>`;
+  s += `<g clip-path="url(#gclip)">`;
+  if (res.poligono && res.poligono.length >= 3) s += `<polygon points="${res.poligono.map(p => sx(p[0]) + "," + sy(p[1])).join(" ")}" style="fill:var(--good);fill-opacity:.2;stroke:none"/>`;
+  R.forEach((r, k) => {
+    const col = PAL[k % PAL.length];
+    if (Math.abs(r.a2) > 1e-12) s += `<line x1="${sx(0)}" y1="${sy(r.b / r.a2)}" x2="${sx(lim)}" y2="${sy((r.b - r.a1 * lim) / r.a2)}" style="stroke:${col};stroke-width:2"/>`;
+    else if (Math.abs(r.a1) > 1e-12) s += `<line x1="${sx(r.b / r.a1)}" y1="${sy(0)}" x2="${sx(r.b / r.a1)}" y2="${sy(lim)}" style="stroke:${col};stroke-width:2"/>`;
+  });
+  if (res.optimo) {
+    const z = res.optimo[2];
+    if (Math.abs(c2) > 1e-12) s += `<line x1="${sx(0)}" y1="${sy(z / c2)}" x2="${sx(lim)}" y2="${sy((z - c1 * lim) / c2)}" style="stroke:var(--crit);stroke-width:1.4;stroke-dasharray:6 4"/>`;
+    else if (Math.abs(c1) > 1e-12) s += `<line x1="${sx(z / c1)}" y1="${sy(0)}" x2="${sx(z / c1)}" y2="${sy(lim)}" style="stroke:var(--crit);stroke-width:1.4;stroke-dasharray:6 4"/>`;
+  }
+  s += `</g>`;
+  for (const [x, y, z] of res.vertices || []) {
+    const right = x < lim * 0.62, up = y < lim * 0.88;
+    s += `<circle cx="${sx(x)}" cy="${sy(y)}" r="4" style="fill:var(--ink)"/><text class="halo" x="${sx(x) + (right ? 8 : -8)}" y="${sy(y) + (up ? -8 : 15)}" text-anchor="${right ? "start" : "end"}">(${gs(x)}, ${gs(y)}) Z=${gs(z)}</text>`;
+  }
+  if (res.optimo) { const [x, y] = res.optimo; s += `<circle cx="${sx(x)}" cy="${sy(y)}" r="9" style="fill:none;stroke:var(--crit);stroke-width:2"/><circle cx="${sx(x)}" cy="${sy(y)}" r="3.5" style="fill:var(--crit)"/>`; }
+  return s + `</svg>`;
+}
+function gOut() {
+  const c1 = num("#g-c1"), c2 = num("#g-c2"), max = $('input[name="g-obj"]:checked').value === "max";
+  const names = [$("#g-n1").value || "x₁", $("#g-n2").value || "x₂"];
+  const bad = GR.some(r => ![r.a1, r.a2, r.b].every(Number.isFinite));
+  const out = $("#g-out");
+  if (!GR.length) { out.innerHTML = `<div class="msg warn">Agregue al menos una restricción.</div>`; return; }
+  if (bad || !Number.isFinite(c1) || !Number.isFinite(c2)) { out.innerHTML = `<div class="msg warn">Complete todos los números (hay celdas vacías).</div>`; return; }
+  const R = GR.map(r => ({ a1: r.a1, a2: r.a2, op: r.op, b: r.b }));
+  const res = resolverPL(c1, c2, R, max);
+  if (res.estado === "infactible") { out.innerHTML = `<div class="msg crit"><b>Problema infactible.</b> Las restricciones no tienen ninguna región en común. Revise los signos y los valores de b.</div>`; return; }
+  let coords = (res.vertices || []).flatMap(v => [v[0], v[1]]).concat([1]);
+  let lim = Math.max(...coords) * (res.estado === "no_acotado" ? 1.6 : 1.15);
+  let h = "";
+  if (res.estado === "no_acotado") h += `<div class="msg crit"><b>Problema no acotado.</b> Z mejora indefinidamente dentro de la región factible. Falta una restricción que limite el crecimiento.</div>`;
+  h += `<div class="card"><h2>Región factible y óptimo</h2>${gPlot(res, R, names, c1, c2, lim)}<div class="legend">${R.map((r, k) => `<span><i style="background:${PAL[k % PAL.length]}"></i>${esc(GR[k].n)}: ${gs(r.a1)}x₁ + ${gs(r.a2)}x₂ ${r.op} ${gs(r.b)}</span>`).join("")}<span><i class="box" style="background:var(--good)"></i>Región factible</span><span><i style="background:var(--crit)"></i>Recta de Z en el óptimo</span></div></div>`;
+  if (res.estado === "optimo") {
+    const [ox, oy, oz] = res.optimo;
+    h += `<div class="card"><div class="msg good" style="margin:0 0 12px"><b>Solución óptima:</b> x₁ = ${gs(ox)} (${esc(names[0])}), x₂ = ${gs(oy)} (${esc(names[1])}) → <b>Z = ${gs(oz)}</b></div>`;
+    if (res.multiples) h += `<div class="msg info">Hay <b>óptimos alternos</b>: la recta de Z es paralela a una restricción. Son óptimos ${res.alternos.map(a => `(${gs(a[0])}, ${gs(a[1])})`).join(" y ")} y todo el segmento que los une.</div>`;
+    h += `<div class="row2" style="gap:18px"><div><h3>Vértices de la región factible</h3><table class="t"><tr><th class="n">x₁</th><th class="n">x₂</th><th class="n">Z</th></tr>${res.vertices.map(v => `<tr class="${Math.abs(v[2] - oz) < 1e-6 ? "best" : ""}"><td class="n">${gs(v[0])}</td><td class="n">${gs(v[1])}</td><td class="n">${gs(v[2])}</td></tr>`).join("")}</table></div>
+    <div><h3>Holgura de cada restricción</h3><table class="t"><tr><th>Restricción</th><th class="n">Holgura</th><th>Estado</th></tr>${GR.map((r, i) => `<tr><td>${esc(r.n)}</td><td class="n">${gs(res.holguras[i])}</td><td>${res.holguras[i] < 1e-6 ? "Activa (agotada)" : "Con holgura"}</td></tr>`).join("")}</table></div></div>`;
+    const d = num("#g-wd"), k = +$("#g-wk").value;
+    if (Number.isFinite(d) && d !== 0 && GR[k]) {
+      const R2 = R.map(r => ({ ...r })); R2[k].b += d;
+      const r2 = resolverPL(c1, c2, R2, max);
+      h += `<h3 style="margin-top:16px">Escenario: b de «${esc(GR[k].n)}» pasa de ${gs(R[k].b)} a ${gs(R2[k].b)}</h3>`;
+      if (r2.estado !== "optimo") h += `<div class="msg warn">Con este cambio el problema queda ${r2.estado.replace("_", " ")}.</div>`;
+      else {
+        const pre = (r2.optimo[2] - oz) / d;
+        h += `<table class="t"><tr><th>Caso</th><th class="n">x₁</th><th class="n">x₂</th><th class="n">Z</th></tr>
+        <tr><td>Base</td><td class="n">${gs(ox)}</td><td class="n">${gs(oy)}</td><td class="n">${gs(oz)}</td></tr>
+        <tr><td>Escenario</td><td class="n">${gs(r2.optimo[0])}</td><td class="n">${gs(r2.optimo[1])}</td><td class="n">${gs(r2.optimo[2])}</td></tr>
+        <tr><td>Cambio</td><td class="n">${gs(r2.optimo[0] - ox)}</td><td class="n">${gs(r2.optimo[1] - oy)}</td><td class="n">${gs(r2.optimo[2] - oz)}</td></tr></table>
+        <div class="msg info" style="margin-top:10px">ΔZ/Δb = <b class="mono">${gs(Math.abs(pre) < 1e-9 ? 0 : pre)}</b> por unidad de «${esc(GR[k].n)}» (precio sombra, válido mientras no cambie el conjunto de restricciones activas).</div>`;
+      }
+    }
+    h += `</div>`;
+  }
+  out.innerHTML = h;
+}
+
+/* ===================== UI: colas ===================== */
+const cIds = ["#c-lam", "#c-mu", "#c-cs", "#c-cw", "#c-smin", "#c-smax", "#c-ssel", "#c-t"];
+cIds.forEach(s => $(s).addEventListener("input", cOut));
+$$('input[name="c-base"]').forEach(r => r.addEventListener("change", cOut));
+$("#c-reset").addEventListener("click", () => { [40, 25, 8, 12, 1, 5, 3, 5].forEach((v, i) => $(cIds[i]).value = v); $$('input[name="c-base"]')[0].checked = true; cOut(); });
+function cOut() {
+  const [lam, mu, cs, cw, smin0, smax0, ssel0, t] = cIds.map(num);
+  const out = $("#c-out");
+  if ([lam, mu, cs, cw, smin0, smax0, ssel0, t].some(v => !Number.isFinite(v)) || lam <= 0 || mu <= 0) { out.innerHTML = `<div class="msg warn">Ingrese λ y μ mayores que 0 y complete los demás campos.</div>`; return; }
+  const smin = Math.max(1, Math.round(smin0)), smax = Math.min(30, Math.max(smin, Math.round(smax0))), ssel = Math.max(1, Math.round(ssel0));
+  const m = mms(lam, mu, ssel), base = $('input[name="c-base"]:checked').value;
+  let h = "";
+  if (!m.estable) h += `<div class="msg crit"><b>Sistema inestable con s = ${ssel}:</b> ρ = λ/(sμ) = ${f(m.rho, 3)} ≥ 1. La fila crece sin límite; se necesitan más cajeros.</div>`;
+  else h += `<div class="card"><h2>Indicadores con s = ${ssel}</h2><div class="kpis" style="margin-top:10px">
+    ${[["ρ (utilización)", f(m.rho, 3)], ["P₀ (sistema vacío)", f(m.P0, 4)], ["P(debe esperar)", f(m.Pespera, 3)], ["P(Wq > " + gs(t) + " min)", f(probEsperaMayor(m, t / 60), 3)], ["L (en sistema)", f(m.L, 3)], ["Lq (en cola)", f(m.Lq, 3)], ["W (min en sistema)", f(m.W * 60, 2)], ["Wq (min en cola)", f(m.Wq * 60, 2)]].map(([k, v]) => `<div class="kpi"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("")}</div></div>`;
+  const tb = tablaCostos(lam, mu, smin, smax, cs, cw, base), ok = tb.filter(x => x.estable);
+  h += `<div class="card"><h2>Costo total vs. número de cajeros</h2>`;
+  if (!ok.length) h += `<div class="msg warn" style="margin-top:10px">Ningún valor del rango es estable; aumente el máximo de cajeros.</div>`;
+  else {
+    const best = ok.reduce((a, b) => b.total < a.total ? b : a);
+    h += `<div class="msg good" style="margin:10px 0 12px"><b>s óptimo = ${best.s} cajeros</b> → costo total = ${f(best.total, 2)} miles COP/hora (servicio ${f(best.cserv, 2)} + espera ${f(best.cesp, 2)})</div>`;
+    h += cChart(ok, best);
+  }
+  h += `<div class="scroll" style="margin-top:12px"><table class="t"><tr><th class="n">s</th><th class="n">ρ</th><th>¿Estable?</th><th class="n">L</th><th class="n">Lq</th><th class="n">W (h)</th><th class="n">Wq (h)</th><th class="n">Costo servicio</th><th class="n">Costo espera</th><th class="n">Costo total</th></tr>
+  ${tb.map(x => { const best = ok.length && x.estable && x.total === Math.min(...ok.map(o => o.total)); return x.estable ? `<tr class="${best ? "best" : ""}"><td class="n">${x.s}</td><td class="n">${f(x.rho, 4)}</td><td>Sí</td><td class="n">${f(x.L)}</td><td class="n">${f(x.Lq)}</td><td class="n">${f(x.W)}</td><td class="n">${f(x.Wq)}</td><td class="n">${f(x.cserv, 2)}</td><td class="n">${f(x.cesp, 2)}</td><td class="n">${f(x.total, 2)}</td></tr>` : `<tr class="off"><td class="n">${x.s}</td><td class="n">${f(x.rho, 4)}</td><td>NO (ρ ≥ 1)</td><td class="n" colspan="7">—</td></tr>`; }).join("")}</table></div></div>`;
+  if (m.estable) h += `<div class="card"><h2>Distribución de clientes en el sistema (s = ${ssel})</h2>${cBars(m)}</div>`;
+  out.innerHTML = h;
+}
+function cChart(ok, best) {
+  const W = 640, H = 300, ml = 50, mr = 16, mt = 14, mb = 40;
+  const xs = ok.map(o => o.s), x0 = Math.min(...xs), x1 = Math.max(...xs), ymax = Math.max(...ok.flatMap(o => [o.cserv, o.cesp, o.total])) * 1.1;
+  const sx = x => x1 === x0 ? (ml + W - mr) / 2 : ml + (x - x0) / (x1 - x0) * (W - ml - mr), sy = y => H - mb - y / ymax * (H - mt - mb);
+  let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Costos por número de cajeros">`;
+  for (const t of ticks(ymax)) s += `<line class="gl" x1="${ml}" y1="${sy(t)}" x2="${W - mr}" y2="${sy(t)}"/><text x="${ml - 7}" y="${sy(t) + 4}" text-anchor="end">${gs(t)}</text>`;
+  s += `<line class="ax" x1="${ml}" y1="${H - mb}" x2="${W - mr}" y2="${H - mb}"/>`;
+  xs.forEach(x => s += `<text x="${sx(x)}" y="${H - mb + 16}" text-anchor="middle">${x}</text>`);
+  s += `<text class="lab" x="${(ml + W - mr) / 2}" y="${H - 5}" text-anchor="middle">Número de cajeros s</text><text class="lab" transform="translate(13 ${(mt + H - mb) / 2}) rotate(-90)" text-anchor="middle">Miles COP / hora</text>`;
+  s += `<line x1="${sx(best.s)}" y1="${mt}" x2="${sx(best.s)}" y2="${H - mb}" style="stroke:var(--crit);stroke-dasharray:5 4;opacity:.6"/>`;
+  [["cserv", "var(--s1)", "Costo de servicio"], ["cesp", "var(--s2)", "Costo de espera"], ["total", "var(--ink)", "Costo total"]].forEach(([k, c, nm]) => {
+    s += `<polyline fill="none" style="stroke:${c};stroke-width:${k === "total" ? 2.6 : 1.8}" points="${ok.map(o => sx(o.s) + "," + sy(o[k])).join(" ")}"/>` + ok.map(o => `<circle cx="${sx(o.s)}" cy="${sy(o[k])}" r="${k === "total" ? 4 : 3}" style="fill:${c}"/>`).join("");
+  });
+  s += `<text class="halo" x="${sx(best.s)}" y="${sy(best.total) - 10}" text-anchor="middle">${f(best.total, 2)}</text></svg>`;
+  return s + `<div class="legend"><span><i style="background:var(--s1)"></i>Costo de servicio</span><span><i style="background:var(--s2)"></i>Costo de espera</span><span><i style="background:var(--ink)"></i>Costo total</span></div>`;
+}
+function cBars(m) {
+  const N = 16, W = 640, H = 220, ml = 50, mr = 16, mt = 10, mb = 38;
+  const P = [...Array(N + 1)].map((_, n) => probN(m, n)), ymax = Math.max(...P) * 1.12;
+  const sy = y => H - mb - y / ymax * (H - mt - mb), bw = (W - ml - mr) / (N + 1);
+  let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Distribución Pn">`;
+  for (const t of ticks(ymax)) s += `<line class="gl" x1="${ml}" y1="${sy(t)}" x2="${W - mr}" y2="${sy(t)}"/><text x="${ml - 7}" y="${sy(t) + 4}" text-anchor="end">${gs(t)}</text>`;
+  P.forEach((p, n) => { s += `<rect x="${ml + n * bw + 2}" y="${sy(p)}" width="${bw - 4}" height="${H - mb - sy(p)}" style="fill:var(--s1)"/>` + (n % 2 === 0 ? `<text x="${ml + n * bw + bw / 2}" y="${H - mb + 15}" text-anchor="middle">${n}</text>` : ""); });
+  s += `<text class="lab" x="${(ml + W - mr) / 2}" y="${H - 4}" text-anchor="middle">n clientes en el sistema</text></svg>`;
+  return s;
+}
+
+/* ===================== UI: Markov ===================== */
+const MB = { P: [[.7, .2, .1], [.25, .6, .15], [.3, .2, .5]], names: ["Central", "Bloque", "Externa"], pi0: [.5, .3, .2] };
+let MN = 3, MNAMES = ["Central", "Bloque", "Externa", "Estado 4", "Estado 5", "Estado 6"], MP = MB.P.map(r => r.slice()), MPI = MB.pi0.slice();
+function mStructUI() {
+  $("#m-names").innerHTML = MNAMES.slice(0, MN).map((n, i) => `<div class="field" style="margin:0 0 8px"><label for="m-nm${i}">Estado ${i + 1}</label><input type="text" id="m-nm${i}" data-i="${i}" value="${esc(n)}"></div>`).join("");
+  const hd = `<tr><th></th>${MNAMES.slice(0, MN).map((n, j) => `<th data-nm="${j}">${esc(n)}</th>`).join("")}</tr>`;
+  $("#m-P").innerHTML = hd + MP.map((r, i) => `<tr><th data-nm="${i}" style="white-space:nowrap">${esc(MNAMES[i])}</th>${r.map((v, j) => `<td><input type="number" step="0.01" data-i="${i}" data-j="${j}" value="${v}" aria-label="P fila ${i + 1} columna ${j + 1}"></td>`).join("")}</tr>`).join("");
+  $("#m-pi0").innerHTML = `<tr>${MNAMES.slice(0, MN).map((n, j) => `<th data-nm="${j}">${esc(n)}</th>`).join("")}</tr><tr>${MPI.map((v, j) => `<td><input type="number" step="0.01" data-p="${j}" value="${v}" aria-label="π(0) estado ${j + 1}"></td>`).join("")}</tr>`;
+  $("#m-ws").innerHTML = MNAMES.slice(0, MN).map((n, i) => `<option value="${i}">${esc(n)}</option>`).join("");
+}
+function mSetN(n) {
+  MN = n;
+  if (n === 3) { MP = MB.P.map(r => r.slice()); MPI = MB.pi0.slice(); } else { MP = Array.from({ length: n }, () => new Array(n).fill(+(1 / n).toFixed(6))); MPI = new Array(n).fill(+(1 / n).toFixed(6)); }
+  mStructUI(); mSyncWr(); mOut();
+}
+function mSyncWr() { const i = +$("#m-ws").value || 0; const v = Number.isFinite(MP[i]?.[i]) ? Math.min(1, Math.max(0, MP[i][i])) : 0; $("#m-wr").value = v; $("#m-wrv").textContent = v.toFixed(2); }
+$("#m-N").addEventListener("change", () => { const n = Math.round(Math.min(6, Math.max(2, parseFloat($("#m-N").value) || 3))); $("#m-N").value = n; mSetN(n); });
+$("#m-names").addEventListener("input", e => { const i = +e.target.dataset.i; MNAMES[i] = e.target.value; $$(`[data-nm="${i}"]`).forEach(t => t.textContent = e.target.value); const o = $("#m-ws").options[i]; if (o) o.textContent = e.target.value; mOut(); });
+$("#m-P").addEventListener("input", e => { const { i, j } = e.target.dataset; if (i === undefined) return; const v = parseFloat(e.target.value); MP[i][j] = Number.isFinite(v) ? v : NaN; e.target.classList.toggle("bad", !Number.isFinite(v)); if ($("#m-wi").checked === false && +$("#m-ws").value === +i && i === j) mSyncWr(); mOut(); });
+$("#m-pi0").addEventListener("input", e => { const p = e.target.dataset.p; if (p === undefined) return; const v = parseFloat(e.target.value); MPI[p] = Number.isFinite(v) ? v : NaN; mOut(); });
+["#m-n", "#m-pob", "#m-wi"].forEach(s => $(s).addEventListener("input", mOut));
+$("#m-ws").addEventListener("change", () => { mSyncWr(); mOut(); });
+$("#m-wr").addEventListener("input", () => { $("#m-wrv").textContent = (+$("#m-wr").value).toFixed(2); mOut(); });
+$("#m-reset").addEventListener("click", () => { $("#m-N").value = 3; $("#m-n").value = 4; $("#m-pob").value = 1000; $("#m-wi").checked = false; MNAMES = ["Central", "Bloque", "Externa", "Estado 4", "Estado 5", "Estado 6"]; mSetN(3); });
+
+function mHeat(P, names) {
+  const N = P.length;
+  return `<div class="heat" style="grid-template-columns: auto repeat(${N}, minmax(54px, 1fr))"><div class="hd"></div>${names.map(n => `<div class="hd">${esc(n)}</div>`).join("")}${P.map((r, i) => `<div class="hd" style="text-align:right">${esc(names[i])}</div>` + r.map(v => `<div style="background:color-mix(in srgb, var(--ink) ${Math.round(v * 70)}%, var(--paper));color:${v > .5 ? "var(--paper)" : "var(--ink)"}">${v.toFixed(2)}</div>`).join("")).join("")}</div>`;
+}
+function mChart(tray, names, pie) {
+  const W = 640, H = 300, ml = 50, mr = 16, mt = 14, mb = 40, n = tray.length - 1;
+  const all = tray.flat().concat(pie || []), ymax = Math.min(1, Math.ceil(Math.max(...all) * 20) / 20 + 0.05);
+  const sx = x => ml + x / Math.max(1, n) * (W - ml - mr), sy = y => H - mb - y / ymax * (H - mt - mb);
+  let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Evolución de la distribución">`;
+  for (const t of ticks(ymax)) s += `<line class="gl" x1="${ml}" y1="${sy(t)}" x2="${W - mr}" y2="${sy(t)}"/><text x="${ml - 7}" y="${sy(t) + 4}" text-anchor="end">${gs(t)}</text>`;
+  s += `<line class="ax" x1="${ml}" y1="${H - mb}" x2="${W - mr}" y2="${H - mb}"/>`;
+  const stp = Math.max(1, Math.ceil(n / 10)); for (let k = 0; k <= n; k += stp) s += `<text x="${sx(k)}" y="${H - mb + 16}" text-anchor="middle">${k}</text>`;
+  s += `<text class="lab" x="${(ml + W - mr) / 2}" y="${H - 5}" text-anchor="middle">n (semanas)</text><text class="lab" transform="translate(13 ${(mt + H - mb) / 2}) rotate(-90)" text-anchor="middle">Probabilidad</text>`;
+  names.forEach((nm, j) => {
+    const c = SER[j % SER.length];
+    if (pie) s += `<line x1="${ml}" y1="${sy(pie[j])}" x2="${W - mr}" y2="${sy(pie[j])}" style="stroke:${c};stroke-dasharray:2 4;opacity:.7"/>`;
+    s += `<polyline fill="none" style="stroke:${c};stroke-width:2" points="${tray.map((p, k) => sx(k) + "," + sy(p[j])).join(" ")}"/>` + tray.map((p, k) => `<circle cx="${sx(k)}" cy="${sy(p[j])}" r="3" style="fill:${c}"/>`).join("");
+  });
+  return s + `</svg><div class="legend">${names.map((nm, j) => `<span><i style="background:${SER[j % SER.length]}"></i>${esc(nm)}</span>`).join("")}<span>Líneas punteadas: estado estable</span></div>`;
+}
+function mOut() {
+  const names = MNAMES.slice(0, MN), out = $("#m-out"), n = Math.max(1, Math.min(60, Math.round(parseFloat($("#m-n").value) || 4))), pob = parseFloat($("#m-pob").value) || 1000;
+  const Pbase = MP.map(r => r.slice());
+  const errs = validarP(Pbase);
+  const sum0 = MPI.reduce((a, b) => a + b, 0);
+  if (MPI.some(v => !Number.isFinite(v) || v < 0) || Math.abs(sum0 - 1) > 1e-6) errs.push(`π(0) debe ser no negativo y sumar 1 (suma actual: ${Number.isFinite(sum0) ? sum0.toFixed(4) : "—"}).`);
+  if (errs.length) { out.innerHTML = errs.map(e => `<div class="msg crit">${esc(e)}</div>`).join(""); return; }
+  let P = Pbase.map(r => r.slice()), wi = false, wsel = +$("#m-ws").value || 0, wr = +$("#m-wr").value;
+  if ($("#m-wi").checked && P[wsel][wsel] < 1 - 1e-9) { const k = (1 - wr) / (1 - P[wsel][wsel]); P[wsel] = P[wsel].map(v => v * k); P[wsel][wsel] = wr; wi = true; }
+  const cl = clasificar(P), tray = proyectar(MPI, P, n), pie = estadoEstable(P), last = tray[n];
+  let h = `<div class="card"><h2>Matriz de transición</h2>${mHeat(P, names)}</div>`;
+  h += `<div class="card"><h2>Proyección a n = ${n} pasos</h2><p class="hint">π(n) = π(0)·Pⁿ</p>
+    <div class="msg good"><b>π(${n}) = (${last.map(v => v.toFixed(4)).join(", ")})</b> → ${names.map((nm, j) => `${esc(nm)}: ${Math.round(last[j] * pob).toLocaleString("es-CO")} personas`).join(", ")}</div>
+    ${mChart(tray, names, pie)}
+    <div class="scroll" style="margin-top:12px"><table class="t"><tr><th class="n">n</th>${names.map(x => `<th class="n">${esc(x)}</th>`).join("")}</tr>${tray.map((p, k) => `<tr><td class="n">${k}</td>${p.map(v => `<td class="n">${v.toFixed(4)}</td>`).join("")}</tr>`).join("")}</table></div></div>`;
+  h += `<div class="card"><h2>Largo plazo (estado estable)</h2><p class="hint">Se resuelve πP = π con Σπᵢ = 1</p>
+    <span class="chip ${cl.irreducible ? "y" : "n"}">Irreducible: ${cl.irreducible ? "sí" : "no"}</span><span class="chip ${cl.aperiodica ? "y" : "n"}">Aperiódica: ${cl.aperiodica ? "sí" : "no"}</span><span class="chip ${cl.ergodica ? "y" : "n"}">Ergódica: ${cl.ergodica ? "sí" : "no"}</span><span class="chip">Absorbentes: ${cl.absorbentes.map(i => esc(names[i])).join(", ") || "ninguno"}</span>`;
+  if (wi) h += `<div class="msg info">Escenario activo: P[${esc(names[wsel])}][${esc(names[wsel])}] = ${wr.toFixed(2)}. Fila modificada: ${names.map((nm, j) => `${esc(nm)} = ${P[wsel][j].toFixed(4)}`).join(", ")}.</div>`;
+  if (!pie) h += `<div class="msg warn">La cadena <b>no es irreducible</b>: no existe una distribución estable única que no dependa del estado inicial (hay estados absorbentes o clases separadas). Se muestra solo la proyección a n pasos.</div>`;
+  else {
+    h += cl.ergodica ? `<div class="msg good">La cadena es ergódica: π(n) converge a π sin importar el estado inicial.</div>` : `<div class="msg warn">La cadena es irreducible pero <b>periódica</b>: π existe y es única, pero π(n) no converge a π (oscila).</div>`;
+    h += `<div class="scroll"><table class="t"><tr><th>Estado</th><th class="n">π (largo plazo)</th><th class="n">Personas</th><th class="n">Retorno medio 1/π (pasos)</th></tr>${names.map((nm, j) => `<tr><td>${esc(nm)}</td><td class="n">${pie[j].toFixed(4)}</td><td class="n">${Math.round(pie[j] * pob).toLocaleString("es-CO")}</td><td class="n">${(1 / pie[j]).toFixed(3)}</td></tr>`).join("")}</table></div>`;
+    if (wi) { const pb = estadoEstable(Pbase); if (pb) h += `<h3 style="margin-top:14px">Comparación: base vs. escenario</h3><div class="scroll"><table class="t"><tr><th>Estado</th><th class="n">π base</th><th class="n">π escenario</th><th class="n">Cambio (pp)</th><th class="n">Personas base</th><th class="n">Personas escenario</th></tr>${names.map((nm, j) => `<tr><td>${esc(nm)}</td><td class="n">${pb[j].toFixed(4)}</td><td class="n">${pie[j].toFixed(4)}</td><td class="n">${((pie[j] - pb[j]) * 100 >= 0 ? "+" : "") + ((pie[j] - pb[j]) * 100).toFixed(2)}</td><td class="n">${Math.round(pb[j] * pob)}</td><td class="n">${Math.round(pie[j] * pob)}</td></tr>`).join("")}</table></div>`; }
+    if (cl.ergodica) h += `<p class="hint" style="margin-top:10px">Con tolerancia 0.001, π(n) alcanza a π en n = ${pasosConv(MPI, P, 1e-3)} pasos.</p>`;
+    const M = primeraPasada(P);
+    h += `<h3 style="margin-top:14px">Tiempo medio de primera pasada (fila → columna, en pasos)</h3><div class="scroll"><table class="t"><tr><th></th>${names.map(x => `<th class="n">${esc(x)}</th>`).join("")}</tr>${M.map((r, i) => `<tr><td>${esc(names[i])}</td>${r.map(v => `<td class="n">${v.toFixed(3)}</td>`).join("")}</tr>`).join("")}</table></div>`;
+    h += `<p class="hint" style="margin-top:10px">Verificación: ‖πP − π‖∞ = <span class="mono">${Math.max(...vmul(pie, P).map((v, i) => Math.abs(v - pie[i]))).toExponential(2)}</span></p>`;
+  }
+  out.innerHTML = h + `</div>`;
+}
+
+/* ===================== arranque ===================== */
+gRowsUI(); gOut(); cOut(); mStructUI(); mSyncWr(); mOut();
+showTab(location.hash.slice(1) || "grafico");
+</script>
+</body>
+</html>
